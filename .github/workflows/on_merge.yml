@@ -1,0 +1,64 @@
+name: "Merge to main branch"
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+jobs:
+  init:
+    name: Install dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: "18"
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      - name: Azure CLI script file
+        uses: azure/cli@v2
+        with:
+          azcliversion: 2.30.0
+          inlineScript: |
+            chmod +x $GITHUB_WORKSPACE/init.sh
+            $GITHUB_WORKSPACE/init.sh
+  run-tests:
+    name: Lint, unit tests and audit
+    runs-on: ubuntu-latest
+    needs: [init]
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: "18"
+      - name: UI lint, unit tests and audit
+        run: cd packages/ui && npm run lint && npm run unit
+      - name: BFF lint, unit tests and audit
+        run: cd packages/bff && npm run lint && npm run unit
+
+  deploy:
+    name: Development environment
+    needs: [init, run-tests]
+    uses: ./.github/workflows/deploy.yml
+
+  FUNCTIONAL_TEST:
+    name: Functional test
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+    container: cypress/browsers:node-18.16.1-chrome-114.0.5735.133-1-ff-114.0.2-edge-114.0.1823.51-1
+    needs: [deploy]
+    strategy:
+      fail-fast: false
+      matrix:
+        # run copies of the current job in parallel
+        containers: [1, 2, 3]
+    steps:
+      - uses: actions/checkout@v3
+      - uses: cypress-io/github-action@v5
+        with:
+          working-directory: packages/functional
+          browser: chrome
+          record: true
+          parallel: true

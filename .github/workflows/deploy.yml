@@ -1,0 +1,166 @@
+on:
+  workflow_call:
+    inputs:
+      env:
+        required: true
+        type: string
+      REDIS_HOST_RESOURCE_ID:
+        required: true
+        type: string
+      REDIS_PORT_RESOURCE_ID:
+        required: true
+        type: string
+      MIN_CLOUD_FUNCTION_INSTANCE:
+        required: true
+        type: number
+      CLOUD_FUNCTION_MEMORY_LIMIT:
+        required: true
+        type: string
+      CRYPTO_SECRET_KEY:
+        required: true
+        type: string
+      CRYPTO_SECRET_IV:
+        required: true
+        type: string
+      UNLEASH_ACCESS_TOKEN:
+        required: true
+        type: string
+      ORDER_API_KEY:
+        required: true
+        type: string
+      AMS_KONG_CLIENT_ID:
+        required: true
+        type: string
+      AMS_KONG_CLIENT_SECRET:
+        required: true
+        type: string
+      DOWNSTREAM_ABORT_DURATION_MS:
+        required: true
+        type: number
+    secrets:
+      AWS_KEY:
+        required: true
+      AWS_SECRET:
+        required: true
+      AWS_REGION:
+        required: true
+      IMD_USERNAME:
+        required: true
+      IMD_PASSWORD:
+        required: true
+      S3_BUCKET_URL:
+        required: true
+      DC_CDN_URL:
+        required: true
+      IMD_SVC_URL:
+        required: true
+      GCP_SERVICE_ACCOUNT_KEY:
+        required: true
+      CIO_GITHUB_PACKAGES_NPM_TOKEN_READ:
+        required: true
+
+jobs:
+  Deployment:
+    environment:
+      name: ${{inputs.env}}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: "18"
+          registry-url: "https://npm.pkg.github.com"
+      - name: Restore node_modules
+        id: cache-ui-node-modules
+        uses: actions/cache@v3
+        with:
+          path: packages/ui/node_modules
+          key: node-modules-${{ hashFiles('packages/ui/package-lock.json') }}
+      - name: Restore BFF node_modules
+        id: cache-bff-node-modules
+        uses: actions/cache@v3
+        with:
+          path: packages/bff/node_modules
+          key: node-modules-${{ hashFiles('packages/bff/package-lock.json') }}
+      - name: Build UI
+        run: cd packages/ui && npm run build -- --env APP_ENV=${{inputs.env}}
+      - name: Build BFF
+        run: cd packages/bff && npm run compile
+      - name: Build Mocks
+        run: cd packages/mocks && npm ci && npm run compile
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.CIO_GITHUB_PACKAGES_NPM_TOKEN_READ }}
+      - name: Set Short SHA
+        id: vars
+        run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+      - name: Check outputs
+        run: echo ${{ steps.vars.outputs.sha_short }}
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_KEY }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      - name: Upload to S3 for ${{inputs.env}} env
+        run: aws s3 sync packages/ui/dist/ ${{ secrets.S3_BUCKET_URL }}/${{ inputs.env }}/dc-ui-checkout/${{ steps.vars.outputs.sha_short }}/
+      - name: Auth with google cloud
+        id: "auth"
+        uses: "google-github-actions/auth@v0"
+        with:
+          credentials_json: "${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}"
+      - id: "secrets"
+        uses: "google-github-actions/get-secretmanager-secrets@v0"
+        with:
+          secrets: |-
+            REDIS_HOST:${{inputs.REDIS_HOST_RESOURCE_ID}}
+            REDIS_PORT:${{inputs.REDIS_PORT_RESOURCE_ID}}
+            CRYPTO_SECRET_KEY:${{inputs.CRYPTO_SECRET_KEY}}
+            CRYPTO_SECRET_IV:${{inputs.CRYPTO_SECRET_IV}}
+            UNLEASH_ACCESS_TOKEN:${{inputs.UNLEASH_ACCESS_TOKEN}}
+            AMS_KONG_CLIENT_ID:${{inputs.AMS_KONG_CLIENT_ID}}
+            AMS_KONG_CLIENT_SECRET:${{inputs.AMS_KONG_CLIENT_SECRET}}
+            ORDER_API_KEY:${{inputs.ORDER_API_KEY}}
+      - name: Set up Cloud SDK
+        uses: "google-github-actions/setup-gcloud@v0"
+      - name: Install gloud beta
+        run: "gcloud components install beta"
+      - name: Create .npmrc file
+        run: echo "//npm.pkg.github.com/:_authToken=${{ secrets.CIO_GITHUB_PACKAGES_NPM_TOKEN_READ }}" > packages/bff/.npmrc
+      - name: "Deploy BFF cloud function to ${{inputs.env}} env"
+        run: |
+          gcloud beta functions deploy dc-ui-checkout-bff-${{inputs.env}} \
+          --service-account cloud-function-deployer-v2@upc-logging-e532ecb4.iam.gserviceaccount.com \
+          --vpc-connector projects/upc-logging-e532ecb4/locations/northamerica-northeast1/connectors/dc-cache-connector \
+          --min-instances ${{inputs.MIN_CLOUD_FUNCTION_INSTANCE}} --memory ${{inputs.CLOUD_FUNCTION_MEMORY_LIMIT}} --set-env-vars \
+          REDIS_HOST=${{steps.secrets.outputs.REDIS_HOST}},\
+          REDIS_PORT=${{steps.secrets.outputs.REDIS_PORT}},\
+          CRYPTO_SECRET_KEY=${{steps.secrets.outputs.CRYPTO_SECRET_KEY}},\
+          CRYPTO_SECRET_IV=${{steps.secrets.outputs.CRYPTO_SECRET_IV}},\
+          UNLEASH_ACCESS_TOKEN=${{steps.secrets.outputs.UNLEASH_ACCESS_TOKEN}},\
+          AMS_KONG_CLIENT_ID=${{steps.secrets.outputs.AMS_KONG_CLIENT_ID}},\
+          AMS_KONG_CLIENT_SECRET=${{steps.secrets.outputs.AMS_KONG_CLIENT_SECRET}},\
+          ORDER_API_KEY=${{steps.secrets.outputs.ORDER_API_KEY}},\
+          NODE_ENV=${{inputs.env}},\
+          DOWNSTREAM_ABORT_DURATION=20000 \
+          --gen2 --runtime nodejs18 --trigger-http --entry-point bff \
+          --source ./packages/bff --allow-unauthenticated --region northamerica-northeast1
+      - name: "Deploy mocks cloud function to ${{inputs.env}}"
+        if: inputs.env == 'development'
+        run: |
+          gcloud beta functions deploy dc-ui-checkout-mock-${{inputs.env}} \
+          --service-account cloud-function-deployer-v2@upc-logging-e532ecb4.iam.gserviceaccount.com \
+          --min-instances 0 \
+          --gen2 --runtime nodejs18 \
+          --trigger-http \
+          --entry-point mocks \
+          --source ./packages/mocks \
+          --allow-unauthenticated --region northamerica-northeast1
+      - name: Update UI import map
+        uses: xingbo828/import-map-updater-action@v1.1
+        with:
+          imd-server: "${{ secrets.IMD_SVC_URL }}"
+          imd-username: "${{ secrets.IMD_USERNAME }}"
+          imd-password: "${{ secrets.IMD_PASSWORD }}"
+          imd-env: "${{inputs.env}}"
+          service: "@digital-commerce/checkout"
+          url: "${{ secrets.DC_CDN_URL }}/${{inputs.env}}/dc-ui-checkout/${{ steps.vars.outputs.sha_short }}/digital-commerce-checkout.js"

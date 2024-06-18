@@ -1,0 +1,33 @@
+{
+    "name": "family-album-mfe",
+    "version": "1.0.0",
+    "private": true,
+    "scripts": {
+        "dev": "npm run dev:shared:build && concurrently npm:dev:bff npm:dev:ui:local",
+        "dev:bff": "npm run docker:start && npm run dev --prefix packages/bff",
+        "dev:shared:build": "npm run build --prefix packages/shared",
+        "dev:ui:local": "npm run dev --prefix packages/ui",
+        "dev:ui:remote": "npm run dev:integrated --prefix packages/ui",
+        "functional": "npm run test:watch --prefix packages/functional",
+        "lint:ui": "npm run lint --prefix packages/ui",
+        "lint:bff": "npm run lint --prefix packages/bff",
+        "lint": "concurrently npm:lint:ui npm:lint:bff",
+        "prepare": "husky install",
+        "commitlint": "commitlint --edit",
+        "commit": "git-cz"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "main": "index.js",
+    "description": "",
+    "devDependencies": {
+        "@commitlint/cli": "^18.6.1",
+        "@commitlint/config-angular": "^18.6.0",
+        "@commitlint/config-conventional": "^18.6.1",
+        "@types/jest": "^29.5.3",
+        "commitizen": "^4.3.0",
+        "concurrently": "^8.2.0",
+        "husky": "^8.0.3"
+    }
+}
