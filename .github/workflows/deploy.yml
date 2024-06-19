@@ -1,5 +1,15 @@
 on:
   workflow_call:
+    secrets:
+      env:
+      POSTGRES_DB_HOST:
+        required: true
+      POSTGRES_DB_USER:
+        required: true
+      POSTGRES_DB_PASSWORD:
+        required: true
+      POSTGRES_DB_DATABASE:
+        required: true
   
 jobs:
   Deployment:
@@ -9,6 +19,13 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           node-version: "18"
+      - name: create env file
+        run: |
+          touch packages/bff/.env
+          echo POSTGRES_DB_HOST=${{ secrets.POSTGRES_DB_HOST }} >> packages/bff/.env
+          echo POSTGRES_DB_USER=${{ secrets.POSTGRES_DB_USER }} >> packages/bff/.env
+          echo POSTGRES_DB_PASSWORD=${{ secrets.POSTGRES_DB_PASSWORD }} >> packages/bff/.env
+          echo POSTGRES_DB_DATABASE=${{ secrets.POSTGRES_DB_DATABASE }} >> packages/bff/.env
       - name: Build UI
         run: cd packages/ui && npm run build -- --env APP_ENV=production
       - name: Build BFF

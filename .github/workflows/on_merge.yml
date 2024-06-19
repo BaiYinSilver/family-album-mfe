@@ -53,6 +53,11 @@ jobs:
     name: Development environment
     needs: [init, run-tests]
     uses: ./.github/workflows/deploy.yml
+    secrets:
+      POSTGRES_DB_HOST: ${{ secrets.POSTGRES_DB_HOST }}
+      POSTGRES_DB_USER: ${{ secrets.POSTGRES_DB_USER }}
+      POSTGRES_DB_PASSWORD: ${{ secrets.POSTGRES_DB_PASSWORD }}
+      POSTGRES_DB_DATABASE: ${{ secrets.POSTGRES_DB_DATABASE }}
 
   FUNCTIONAL_TEST:
     name: Functional test

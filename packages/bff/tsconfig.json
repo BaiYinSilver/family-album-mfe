@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "paths": {
+      "@shared": ["../shared/src/index.ts"],
+      "@shared/*": ["../shared/src/*"]
+    }
+  },
+  "exclude": ["**/*.spec.ts"],
+  "references": [
+    {
+      "path": "../shared"
+    }
+  ]
+}
