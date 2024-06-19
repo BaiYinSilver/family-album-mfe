@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "declaration": true,
+    "declarationMap": true,
+    "composite": true,
+    "outDir": "dist",
+    "rootDir": "src"
+  },
+  "include": [
+    "src/**/*",
+    "package.json"
+  ],
+  "files": [
+    "src/index.ts"
+  ],
+  "references": []
+}

@@ -4,7 +4,7 @@
     "private": true,
     "scripts": {
         "dev": "npm run dev:shared:build && concurrently npm:dev:bff npm:dev:ui:local",
-        "dev:bff": "npm run docker:start && npm run dev --prefix packages/bff",
+        "dev:bff": "npm run dev --prefix packages/bff",
         "dev:shared:build": "npm run build --prefix packages/shared",
         "dev:ui:local": "npm run dev --prefix packages/ui",
         "dev:ui:remote": "npm run dev:integrated --prefix packages/ui",
