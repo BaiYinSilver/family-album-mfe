@@ -26,6 +26,7 @@ jobs:
       - name: Azure Login
         uses: azure/login@v2
         with:
+          # https://github.com/Azure/login?tab=readme-ov-file#login-with-a-service-principal-secret
           creds: '{"clientId":"${{ secrets.AZURE_CLIENT_ID }}","clientSecret":"${{ secrets.AZURE_CLIENT_SECRET }}","subscriptionId":"${{ secrets.AZURE_SUBSCRIPTION_ID }}","tenantId":"${{ secrets.AZURE_TENANT_ID }}"}'
       - name: Azure CLI script file
         uses: azure/cli@v2
