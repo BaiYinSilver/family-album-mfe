@@ -8,7 +8,7 @@
         "compile": "tsc -b --force tsconfig.json",
         "unit:watch": "TZ=UTC jest --watchAll",
         "unit": "TZ=UTC jest",
-        "dev": "rm -rf dist && NODE_ENV=local tsc-watch -b"
+        "dev": "rm -rf dist && NODE_ENV=local tsc-watch -b --onSuccess 'node ./dist/index.js'"
     },
     "keywords": [],
     "author": "",

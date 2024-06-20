@@ -1,4 +1,5 @@
 import fastify from 'fastify'
+import { FastifyRequest, FastifyReply, FastifyInstance } from 'fastify';
 import fastifyHealthcheck from 'fastify-healthcheck'
 import fastifyCors from '@fastify/cors'
 import fastifyBoom from 'fastify-boom'
@@ -14,9 +15,11 @@ declare module 'fastify' {
     }
 }
 
+
 function build(opts = {}) {
     const app = fastify(opts)
     app.decorate('config', config())
+
     app.register(fastifyBoom)
     app.register(fastifyCors)
     app.register(fastifyHealthcheck)
