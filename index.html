@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Web Bluetooth Example</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      margin-top: 50px;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      margin: 10px;
+    }
+    #status {
+      margin-top: 20px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <h1>Web Bluetooth Example</h1>
+  <button id="connectButton">Connect to Device</button>
+  <button id="sendButton" disabled>Send Random Number</button>
+  <p id="status">Not connected</p>
+
+  <script>
+    // UUIDs for the service and characteristic
+    const SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
+    const CHARACTERISTIC_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
+
+    let device;
+    let characteristic;
+
+    // Connect to the Bluetooth device
+    document.getElementById("connectButton").addEventListener("click", async () => {
+      try {
+        // Request a Bluetooth device
+        device = await navigator.bluetooth.requestDevice({
+          filters: [{ services: [SERVICE_UUID] }],
+        });
+
+        // Update status
+        document.getElementById("status").textContent = `Connected to: ${device.name}`;
+        document.getElementById("sendButton").disabled = false;
+
+        // Connect to the GATT server
+        const server = await device.gatt.connect();
+
+        // Get the service and characteristic
+        const service = await server.getPrimaryService(SERVICE_UUID);
+        characteristic = await service.getCharacteristic(CHARACTERISTIC_UUID);
+
+        // Listen for changes to the characteristic
+        characteristic.addEventListener("characteristicvaluechanged", (event) => {
+          const value = event.target.value.getUint8(0);
+          console.log(`Received number: ${value}`);
+        });
+        await characteristic.startNotifications();
+
+      } catch (error) {
+        console.error("Error:", error);
+        document.getElementById("status").textContent = "Failed to connect.";
+      }
+    });
+
+    // Send a random number to the connected device
+    document.getElementById("sendButton").addEventListener("click", async () => {
+      if (!characteristic) {
+        alert("Not connected to a device.");
+        return;
+      }
+
+      // Generate a random number between 1 and 100
+      const randomNumber = Math.floor(Math.random() * 100) + 1;
+
+      // Send the number to the device
+      const buffer = new Uint8Array([randomNumber]);
+      await characteristic.writeValue(buffer);
+
+      console.log(`Sent number: ${randomNumber}`);
+      document.getElementById("status").textContent = `Sent number: ${randomNumber}`;
+    });
+  </script>
+</body>
+</html>
