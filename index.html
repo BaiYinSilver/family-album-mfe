@@ -3,86 +3,61 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Web Bluetooth Example</title>
+  <title>Play Audio on Bluetooth Speaker</title>
   <style>
     body {
       font-family: Arial, sans-serif;
-      text-align: center;
-      margin-top: 50px;
+      margin: 20px;
+    }
+    #device-list {
+      margin-bottom: 20px;
     }
     button {
       padding: 10px 20px;
       font-size: 16px;
-      margin: 10px;
-    }
-    #status {
-      margin-top: 20px;
-      font-weight: bold;
+      cursor: pointer;
     }
   </style>
 </head>
 <body>
-  <h1>Web Bluetooth Example</h1>
-  <button id="connectButton">Connect to Device</button>
-  <button id="sendButton" disabled>Send Random Number</button>
-  <p id="status">Not connected</p>
+  <h1>Play Audio on Bluetooth Speaker</h1>
+  <p>Select a Bluetooth device to play the audio file.</p>
+
+  <div id="device-list">
+    <button id="scan-button">Scan for Bluetooth Devices</button>
+    <ul id="devices"></ul>
+  </div>
+
+  <audio id="audio" controls>
+    <source src="sound.mp3" type="audio/mpeg">
+    Your browser does not support the audio element.
+  </audio>
 
   <script>
-    // UUIDs for the service and characteristic
-    const SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
-    const CHARACTERISTIC_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
+    const scanButton = document.getElementById('scan-button');
+    const devicesList = document.getElementById('devices');
+    const audioElement = document.getElementById('audio');
 
-    let device;
-    let characteristic;
-
-    // Connect to the Bluetooth device
-    document.getElementById("connectButton").addEventListener("click", async () => {
+    // Scan for Bluetooth devices
+    scanButton.addEventListener('click', async () => {
       try {
         // Request a Bluetooth device
-        device = await navigator.bluetooth.requestDevice({
-          filters: [{ services: [SERVICE_UUID] }],
+        const device = await navigator.bluetooth.requestDevice({
+          acceptAllDevices: true, // Allow all devices
+          optionalServices: ['battery_service'] // Example service
         });
 
-        // Update status
-        document.getElementById("status").textContent = `Connected to: ${device.name}`;
-        document.getElementById("sendButton").disabled = false;
+        // Display the selected device
+        const listItem = document.createElement('li');
+        listItem.textContent = `Selected Device: ${device.name || 'Unknown'} (ID: ${device.id})`;
+        devicesList.appendChild(listItem);
 
-        // Connect to the GATT server
-        const server = await device.gatt.connect();
-
-        // Get the service and characteristic
-        const service = await server.getPrimaryService(SERVICE_UUID);
-        characteristic = await service.getCharacteristic(CHARACTERISTIC_UUID);
-
-        // Listen for changes to the characteristic
-        characteristic.addEventListener("characteristicvaluechanged", (event) => {
-          const value = event.target.value.getUint8(0);
-          console.log(`Received number: ${value}`);
-        });
-        await characteristic.startNotifications();
-
+        // Play the audio file
+        audioElement.play();
+        console.log('Playing audio on the selected device...');
       } catch (error) {
-        console.error("Error:", error);
-        document.getElementById("status").textContent = "Failed to connect.";
+        console.error('Error selecting Bluetooth device:', error);
       }
-    });
-
-    // Send a random number to the connected device
-    document.getElementById("sendButton").addEventListener("click", async () => {
-      if (!characteristic) {
-        alert("Not connected to a device.");
-        return;
-      }
-
-      // Generate a random number between 1 and 100
-      const randomNumber = Math.floor(Math.random() * 100) + 1;
-
-      // Send the number to the device
-      const buffer = new Uint8Array([randomNumber]);
-      await characteristic.writeValue(buffer);
-
-      console.log(`Sent number: ${randomNumber}`);
-      document.getElementById("status").textContent = `Sent number: ${randomNumber}`;
     });
   </script>
 </body>
